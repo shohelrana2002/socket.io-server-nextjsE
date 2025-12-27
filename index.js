@@ -1,38 +1,64 @@
 import express from "express";
 import http from "http";
-import { Server } from "socket.io";
 import dotenv from "dotenv";
+import { Server } from "socket.io";
+import axios from "axios";
+
 dotenv.config();
 const app = express();
+app.use(express.json());
 const server = http.createServer(app);
 const port = process.env.PORT || 4000;
 
-// socket server
 const io = new Server(server, {
   cors: {
-    origin: process.env.NEXT_BASE_URL, // react url
-    credentials: true,
+    origin: process.env.NEXT_BASE_URL,
   },
 });
-/*==================এখানে মনে রাখো===================*/
-// on = receive
-// emit = send
+
 io.on("connection", (socket) => {
-  console.log("🟢 User connected:", socket.id);
-
-  //   // receive message
-  //   socket.on("send-message", (data) => {
-  //     console.log("📩 Message:", data);
-
-  //     // send to client
-  //     socket.emit("receive-message", "Hello from server 👋");
-  //   });
-
+  socket.on("identity", async (userId) => {
+    await axios.post(`${process.env.NEXT_BASE_URL}/api/socket/connect`, {
+      userId,
+      socketId: socket.id,
+    });
+    console.log("userId", userId);
+  });
+  socket.on("update-location", async ({ userId, latitude, longitude }) => {
+    const location = {
+      type: "Point",
+      coordinates: [latitude, longitude],
+    };
+    await axios.post(
+      `${process.env.NEXT_BASE_URL}/api/socket/update-location`,
+      {
+        userId,
+        location,
+      }
+    );
+    console.log("location:", location);
+  });
   socket.on("disconnect", () => {
-    console.log("🔴 User disconnected");
+    console.log("User disconnected");
   });
 });
 
+// notify
+app.post("/notify", (req, res) => {
+  const { event, data, socketId } = req.body;
+  if (socketId) {
+    io.to(socketId).emit(event, data);
+  } else {
+    io.emit(event, data);
+  }
+
+  return res.status(200).json({ success: true });
+});
+
+app.get("/", (req, res) => {
+  res.send("Socket server is running 🚀");
+});
+
 server.listen(port, () => {
-  console.log("Server running on port :", port);
+  console.log("🚀 Socket server running on port", port);
 });
