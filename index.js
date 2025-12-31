@@ -24,6 +24,7 @@ io.on("connection", (socket) => {
     });
     console.log("userId", userId);
   });
+  /*========= delivery boy Location =========== */
   socket.on("update-location", async ({ userId, latitude, longitude }) => {
     const location = {
       type: "Point",
@@ -31,14 +32,23 @@ io.on("connection", (socket) => {
     };
     await axios.post(
       `${process.env.NEXT_BASE_URL}/api/socket/update-location`,
-      {
-        userId,
-        location,
-      }
+      { userId, location }
     );
-    console.log("location:", location);
-    /*========= delivery boy Location =========== */
     io.emit("update-deliveryBoy-location", { userId, location });
+    console.log("location:", location);
+  });
+
+  /*================ message socket =============== */
+
+  socket.on("join-room", async (roomId) => {
+    console.log("join-with-roomId:", roomId);
+    socket.join(roomId);
+  });
+
+  socket.on("send-message", async (message) => {
+    await axios.post(`${process.env.NEXT_BASE_URL}/api/chat/save`, message);
+    io.to(message.roomId).emit("send-message", message);
+    console.log(message);
   });
 
   socket.on("disconnect", () => {
